@@ -7,6 +7,7 @@
 using namespace std;
 inline string i2s(int number)
 {
+    //new code
     string s;
     if(number == 0){
         s = (char)(0 + '0');
