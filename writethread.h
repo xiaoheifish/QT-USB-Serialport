@@ -18,13 +18,6 @@ public:
     void stop();
 protected:
     void run();
-
-
-<<<<<<< HEAD
-private slots:
-
-=======
->>>>>>> 1f55b256b6ee6ae379dd9bbdf7ebd6318d7b8866
 private:
 
     volatile bool stopped;
