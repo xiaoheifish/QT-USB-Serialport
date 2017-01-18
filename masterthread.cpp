@@ -49,8 +49,12 @@ MasterThread::MasterThread(QObject *parent)
 MasterThread::~MasterThread()
 {
     mutex.lock();
+<<<<<<< HEAD
     isReading = 0;
     //serial.close();
+=======
+    quit = true;
+>>>>>>> 1f55b256b6ee6ae379dd9bbdf7ebd6318d7b8866
     cond.wakeOne();
     mutex.unlock();
     wait();
@@ -58,8 +62,12 @@ MasterThread::~MasterThread()
 
 void MasterThread::transaction(const QString &portName, int waitTimeout, const QString &request, int writeread)
 {
+<<<<<<< HEAD
     isReading = 1;
     quit = false;
+=======
+
+>>>>>>> 1f55b256b6ee6ae379dd9bbdf7ebd6318d7b8866
     QMutexLocker locker(&mutex);
     this->portName = portName;
     this->waitTimeout = waitTimeout;
@@ -68,12 +76,22 @@ void MasterThread::transaction(const QString &portName, int waitTimeout, const Q
     if (!isRunning())
         start();
     else {
+<<<<<<< HEAD
+=======
+        while (working) {
+            sleep(1);
+        }
+>>>>>>> 1f55b256b6ee6ae379dd9bbdf7ebd6318d7b8866
         cond.wakeOne();
     }
 }
 void MasterThread::run()
 {
     bool currentPortNameChanged = false;
+<<<<<<< HEAD
+=======
+
+>>>>>>> 1f55b256b6ee6ae379dd9bbdf7ebd6318d7b8866
     mutex.lock();
     QString currentPortName;
     if (currentPortName != portName) {
@@ -82,6 +100,7 @@ void MasterThread::run()
     }
     int currentWaitTimeout = waitTimeout;
     QString currentRequest = request;
+<<<<<<< HEAD
     QSerialPort serial;
     mutex.unlock();
     while(!quit){
@@ -101,6 +120,22 @@ void MasterThread::run()
                        .arg(portName).arg(serial.error()));
             return;
         }
+=======
+    mutex.unlock();
+    QSerialPort serial;
+    while (!quit) {
+        working = true;
+        if (currentPortNameChanged) {
+            serial.close();
+            serial.setPortName(currentPortName);
+            if (!serial.open(QIODevice::ReadWrite)) {
+                emit error(tr("Can't open %1, error code %2")
+                           .arg(portName).arg(serial.error()));
+                return;
+            }
+        }
+        // write request
+>>>>>>> 1f55b256b6ee6ae379dd9bbdf7ebd6318d7b8866
         if(writeread == 10){
             serial.setBaudRate(QSerialPort::Baud115200);
             QByteArray requestData = intToByte(currentRequest.mid(0,2).toInt());
@@ -126,7 +161,11 @@ void MasterThread::run()
             //cond.wait(&mutex);
         }
         if(writeread == 11){
+<<<<<<< HEAD
             serial.setBaudRate(QSerialPort::Baud115200);
+=======
+            serial.setBaudRate(QSerialPort::Baud9600);
+>>>>>>> 1f55b256b6ee6ae379dd9bbdf7ebd6318d7b8866
             QByteArray requestData1 = intToByte(currentRequest.mid(0,2).toInt());
             requestData1.resize(1);
             serial.write(requestData1);
@@ -151,12 +190,24 @@ void MasterThread::run()
             //mutex.lock();
             //cond.wait(&mutex);
         }
+<<<<<<< HEAD
         while(writeread == 12 && isReading == 1){
             serial.setBaudRate(QSerialPort::Baud115200);
             if(currentRequest == "20"){
                 QByteArray requestData2;
                 requestData2.resize(1);
                 requestData2[0] = 0x20;
+=======
+        if(writeread == 12){
+            serial.setBaudRate(QSerialPort::Baud115200);
+            if(currentRequest == "20212223"){
+                QByteArray requestData2;
+                requestData2.resize(4);
+                requestData2[0] = 0x20;
+                requestData2[1] = 0x21;
+                requestData2[2] = 0x22;
+                requestData2[3] = 0x23;
+>>>>>>> 1f55b256b6ee6ae379dd9bbdf7ebd6318d7b8866
                 serial.write(requestData2);
                 if (serial.waitForBytesWritten(waitTimeout)) {
                     // read response
@@ -184,6 +235,7 @@ void MasterThread::run()
                     emit timeout(tr("Wait write request timeout %1")
                                  .arg(QTime::currentTime().toString()));
                 }
+<<<<<<< HEAD
             }
             if(currentRequest == "24"){
                 QByteArray requestData3;
@@ -252,6 +304,17 @@ void MasterThread::run()
                 QByteArray requestData3;
                 requestData3.resize(1);
                 requestData3[0] = 0x24;
+=======
+
+            }
+            if(currentRequest == "24252627"){
+                QByteArray requestData3;
+                requestData3.resize(4);
+                requestData3[0] = 0x24;
+                requestData3[1] = 0x25;
+                requestData3[2] = 0x26;
+                requestData3[3] = 0x27;
+>>>>>>> 1f55b256b6ee6ae379dd9bbdf7ebd6318d7b8866
                 serial.write(requestData3);
                 if (serial.waitForBytesWritten(waitTimeout)) {
                     // read response
@@ -279,10 +342,18 @@ void MasterThread::run()
                     emit timeout(tr("Wait write request timeout %1")
                                  .arg(QTime::currentTime().toString()));
                 }
+<<<<<<< HEAD
             }
         }
         mutex.lock();
         serial.close();
+=======
+
+            }
+        }
+        mutex.lock();
+        working = false;
+>>>>>>> 1f55b256b6ee6ae379dd9bbdf7ebd6318d7b8866
         cond.wait(&mutex);
         if (currentPortName != portName) {
             currentPortName = portName;
@@ -299,8 +370,11 @@ void MasterThread::run()
 void MasterThread::stop(){
     quit = true;
 }
+<<<<<<< HEAD
 
 void MasterThread::setReading(int isReading) {
     this->isReading = isReading;
     //quit = true;
 }
+=======
+>>>>>>> 1f55b256b6ee6ae379dd9bbdf7ebd6318d7b8866
