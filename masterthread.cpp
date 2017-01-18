@@ -44,20 +44,23 @@ MasterThread::MasterThread(QObject *parent)
     : QThread(parent), waitTimeout(0), quit(false)
 {
     working = false;
+    hash[0] = 115200;
+    hash[1] = 57600;
+    hash[2] = 38400;
+    hash[3] = 19200;
+    hash[4] = 9600;
 }
 
 MasterThread::~MasterThread()
 {
     mutex.lock();
     isReading = 0;
-    //serial.close();
-
     cond.wakeOne();
     mutex.unlock();
     wait();
 }
 
-void MasterThread::transaction(const QString &portName, int waitTimeout, const QString &request, int writeread)
+void MasterThread::transaction(const QString &portName, int baudRate, int waitTimeout, const QString &request, int writeread)
 {
 
     isReading = 1;
@@ -65,6 +68,7 @@ void MasterThread::transaction(const QString &portName, int waitTimeout, const Q
     QMutexLocker locker(&mutex);
     this->portName = portName;
     this->waitTimeout = waitTimeout;
+    this->baudRate = hash[baudRate];
     this->request = request;
     this->writeread = writeread;
     if (!isRunning())
@@ -103,9 +107,9 @@ void MasterThread::run()
             emit error(tr("Can't open %1, error code %2")
                        .arg(portName).arg(serial.error()));
             return;
-        }
+        }    
         if(writeread == 10){
-            serial.setBaudRate(QSerialPort::Baud115200);
+            serial.setBaudRate(baudRate);
             QByteArray requestData = intToByte(currentRequest.mid(0,2).toInt());
             qDebug()<<currentRequest.length();
             if(currentRequest.length()==4){
@@ -129,8 +133,7 @@ void MasterThread::run()
             //cond.wait(&mutex);
         }
         if(writeread == 11){
-
-            serial.setBaudRate(QSerialPort::Baud115200);
+            serial.setBaudRate(baudRate);
             QByteArray requestData1 = intToByte(currentRequest.mid(0,2).toInt());
             requestData1.resize(1);
             serial.write(requestData1);
@@ -157,7 +160,7 @@ void MasterThread::run()
         }
 
         while(writeread == 12 && isReading == 1){
-            serial.setBaudRate(QSerialPort::Baud115200);
+            serial.setBaudRate(baudRate);
             if(currentRequest == "20"){
                 QByteArray requestData2;
                 requestData2.resize(1);

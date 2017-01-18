@@ -47,6 +47,9 @@ MainWindow::MainWindow(QWidget *parent) :
             this,SLOT(showserial(QString)));
     connect(&serialthread, SIGNAL(responserial2(QString)),
             this,SLOT(showserial2(QString)));
+    foreach (const QSerialPortInfo &info, QSerialPortInfo::availablePorts())
+        ui->serialPortComboBox->addItem(info.portName());
+    ui->serialPortComboBox->setFocus();
 //    myserial = new MasterThread();
 //    myserial->transaction(ui->serialPortComboBox->currentText(),
 //                          1000,
@@ -72,6 +75,16 @@ void MainWindow::on_radioButtonSerial_clicked(){
     foreach (const QSerialPortInfo &info, QSerialPortInfo::availablePorts())
         ui->serialPortComboBox->addItem(info.portName());
     ui->serialPortComboBox->setFocus();
+    qDebug()<<ui->comboBoxBaud->currentIndex();
+    if(ui->serialPortComboBox->currentText()!=""){
+        int writeread = 11;
+        int timeout = 1000;
+        serialthread.transaction(ui->serialPortComboBox->currentText(),
+                                 ui->comboBoxBaud->currentIndex(),
+                                 timeout,
+                                 "255",
+                                 writeread);
+    }
 }
 void MainWindow::on_radioButtonUSB_clicked(){
     USBcomm = true;
@@ -98,11 +111,9 @@ void MainWindow::on_radioButtonreadstop_clicked()
 //    if(serialthread.isRunning()){
 //        serialthread.stop();
 //    }
-
 }
 void MainWindow::on_buttonSelfWrite_clicked()
 {
-
     BYTE TxBufferAdd[2]={0};
     DWORD BytesWritten;
     TxBufferAdd[0]=0x01;
@@ -242,6 +253,7 @@ void MainWindow::on_buttonSelfWrite_2_clicked()
     int writeread = 10;
     int timeout = 1000;
     serialthread.transaction(ui->serialPortComboBox->currentText(),
+                             ui->comboBoxBaud->currentIndex(),
                              timeout,
                              "01" + ui->textSelfWrite_2->text(),
                              writeread);
@@ -252,6 +264,7 @@ void MainWindow::on_buttonSelfRead_2_clicked()
     int writeread = 11;
     int timeout = 1000;
     serialthread.transaction(ui->serialPortComboBox->currentText(),
+                             ui->comboBoxBaud->currentIndex(),
                              timeout,
                              "08",
                              writeread);
@@ -272,6 +285,7 @@ void MainWindow::on_buttonAddWrite_2_clicked()
         requestdata = "16" + ui->textPathOne_2->text() + "17" + ui->textPathTwo_2->text();
     }
     serialthread.transaction(ui->serialPortComboBox->currentText(),
+                             ui->comboBoxBaud->currentIndex(),
                              timeout,
                              requestdata,
                              writeread);
@@ -294,6 +308,7 @@ void MainWindow::writeserial()
         requestdata = "2024";
     }
     serialthread.transaction(ui->serialPortComboBox->currentText(),
+                             ui->comboBoxBaud->currentIndex(),
                              timeout,
                              requestdata,
                              writeread);
