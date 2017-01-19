@@ -108,6 +108,19 @@ void MasterThread::run()
                        .arg(portName).arg(serial.error()));
             return;
         }    
+        if(writeread == 9){
+            serial.setBaudRate(baudRate);
+            QByteArray requestData1 = intToByte(currentRequest.mid(0,2).toInt());
+            requestData1.resize(1);
+            serial.write(requestData1);
+            if (serial.waitForBytesWritten(waitTimeout)) {
+            } else {
+                emit timeout(tr("Wait write request timeout %1")
+                             .arg(QTime::currentTime().toString()));
+            }
+            //mutex.lock();
+            //cond.wait(&mutex);
+        }
         if(writeread == 10){
             serial.setBaudRate(baudRate);
             QByteArray requestData = intToByte(currentRequest.mid(0,2).toInt());

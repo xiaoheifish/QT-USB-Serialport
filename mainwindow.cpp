@@ -77,7 +77,7 @@ void MainWindow::on_radioButtonSerial_clicked(){
     ui->serialPortComboBox->setFocus();
     qDebug()<<ui->comboBoxBaud->currentIndex();
     if(ui->serialPortComboBox->currentText()!=""){
-        int writeread = 11;
+        int writeread = 9;
         int timeout = 1000;
         serialthread.transaction(ui->serialPortComboBox->currentText(),
                                  ui->comboBoxBaud->currentIndex(),
