@@ -27,6 +27,7 @@ private slots:
     void writeserial();
     void showserial(const QString &s);
     void showserial2(const QString &s);
+    void pathtwosenddata();
     void on_buttonSelfWrite_clicked();
     void on_buttonSelfRead_clicked();
     void on_buttonAddWrite_clicked();
@@ -40,12 +41,15 @@ private slots:
     //void on_buttonReadStop_clicked();
     void on_radioButtonUSBStop_clicked();
     void on_radioButtonreadstop_clicked();
+    void on_buttonUSBStart_clicked();
 private:
     Ui::MainWindow *ui;
     FT_HANDLE ftHandle;
     QTimer timer;
     QTimer timer2;
     QTimer timerserial;
+    int currentBaudRate;
+    int baudCount = 0;
     bool flagOne = true;
     bool flagTwo = false;
     bool USBcomm = false;
@@ -54,6 +58,7 @@ private:
     unsigned long serialcount1 = 0;
     unsigned long serialcount2 = 0;
     MasterThread serialthread;
+    MasterThread serialthread1;
     MasterThread *myserial;
 
     //writethread thread;

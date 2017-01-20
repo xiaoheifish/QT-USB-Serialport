@@ -18,6 +18,9 @@ public:
     void stop();
 protected:
     void run();
+private slots:
+
+
 private:
 
     volatile bool stopped;

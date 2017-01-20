@@ -47,17 +47,12 @@ MainWindow::MainWindow(QWidget *parent) :
             this,SLOT(showserial(QString)));
     connect(&serialthread, SIGNAL(responserial2(QString)),
             this,SLOT(showserial2(QString)));
+    connect(&serialthread, SIGNAL(pathtwosend()),
+            this,SLOT(pathtwosenddata()));
     foreach (const QSerialPortInfo &info, QSerialPortInfo::availablePorts())
         ui->serialPortComboBox->addItem(info.portName());
     ui->serialPortComboBox->setFocus();
-//    myserial = new MasterThread();
-//    myserial->transaction(ui->serialPortComboBox->currentText(),
-//                          1000,
-//                          "01" + ui->textSelfWrite_2->text(),
-//                          11);
-
 }
-
 MainWindow::~MainWindow()
 {
     delete ui;
@@ -69,20 +64,36 @@ MainWindow::~MainWindow()
         FT_Close(ftHandle);
     }
 }
-void MainWindow::on_radioButtonSerial_clicked(){
+void MainWindow::pathtwosenddata(){
+    int writeread = 9;
+    int timeout = 1000;
+    if(ui->serialPortComboBox->currentText()!=""){
+        currentBaudRate = ui->comboBoxBaud->currentIndex();
+        serialthread.transaction(ui->serialPortComboBox->currentText(),
+                                 ui->comboBoxBaud->currentIndex(),
+                                 timeout,
+                                 "88",
+                                 writeread);
+    }
+}
 
+void MainWindow::on_radioButtonSerial_clicked(){
+    //delete current item
+    for(int i =0 ; i < ui->serialPortComboBox->count();i++){
+        ui->serialPortComboBox->removeItem(0);
+    }
     //Get current available COM port
     foreach (const QSerialPortInfo &info, QSerialPortInfo::availablePorts())
         ui->serialPortComboBox->addItem(info.portName());
     ui->serialPortComboBox->setFocus();
-    qDebug()<<ui->comboBoxBaud->currentIndex();
+    int writeread = 9;
+    int timeout = 1000;
     if(ui->serialPortComboBox->currentText()!=""){
-        int writeread = 9;
-        int timeout = 1000;
+        currentBaudRate = ui->comboBoxBaud->currentIndex();
         serialthread.transaction(ui->serialPortComboBox->currentText(),
                                  ui->comboBoxBaud->currentIndex(),
                                  timeout,
-                                 "255",
+                                 "FF",
                                  writeread);
     }
 }
@@ -108,9 +119,18 @@ void MainWindow::on_radioButtonUSBStop_clicked()
 void MainWindow::on_radioButtonreadstop_clicked()
 {
     serialthread.setReading(0);
-//    if(serialthread.isRunning()){
-//        serialthread.stop();
-//    }
+    if(serialthread.getState()!=12){
+        int writeread = 9;
+        int timeout = 1000;
+        if(ui->serialPortComboBox->currentText()!=""){
+            currentBaudRate = ui->comboBoxBaud->currentIndex();
+            serialthread.transaction(ui->serialPortComboBox->currentText(),
+                                     ui->comboBoxBaud->currentIndex(),
+                                     timeout,
+                                     "88",
+                                     writeread);
+        }
+    }
 }
 void MainWindow::on_buttonSelfWrite_clicked()
 {
@@ -172,6 +192,7 @@ void MainWindow::on_buttonAddWrite_clicked()
     timer.start(1);
     connect(&timer,SIGNAL(timeout()),this,SLOT(writeOne()));
     //QMessageBox::information(this, "Message", "位宽数据已经写入硬件");
+
 }
 
 void MainWindow::writeOne(){
@@ -214,6 +235,7 @@ void MainWindow::writeOne(){
             ui->textBrowserPathOne->append(numberRec);
         }
     }
+
     if(ui->checkBoxPathTwo->isChecked()){
         TxBuffer[0]=0x24;
         ftStatus = FT_Write(ftHandle, TxBuffer, 1, &BytesWritten);
@@ -241,6 +263,7 @@ void MainWindow::writeOne(){
             ui->textBrowserPathTwo->append(numberRec2);
         }
     }
+
 }
 
 void MainWindow::showResponse(const QString &s)
@@ -257,6 +280,7 @@ void MainWindow::on_buttonSelfWrite_2_clicked()
                              timeout,
                              "01" + ui->textSelfWrite_2->text(),
                              writeread);
+    //QMessageBox::information(this, "Message", "自检数据已经写入硬件");
 }
 
 void MainWindow::on_buttonSelfRead_2_clicked()
@@ -289,14 +313,16 @@ void MainWindow::on_buttonAddWrite_2_clicked()
                              timeout,
                              requestdata,
                              writeread);
-    //timerserial.start(500);
-    //connect(&timerserial,SIGNAL(timeout()),this,SLOT(writeserial()));
+}
+void MainWindow::on_buttonUSBStart_clicked()
+{
     writeserial();
 }
 void MainWindow::writeserial()
 {
     int writeread = 12;
     int timeout = 1000;
+    flagOne = true;
     QString requestdata="";
     if(ui->checkBoxPathOne_2->isChecked()&&(ui->checkBoxPathTwo_2->checkState()==Qt::Unchecked)){
         requestdata = "20";
@@ -307,29 +333,31 @@ void MainWindow::writeserial()
     if(ui->checkBoxPathOne_2->isChecked()&&ui->checkBoxPathTwo_2->isChecked()){
         requestdata = "2024";
     }
-    serialthread.transaction(ui->serialPortComboBox->currentText(),
-                             ui->comboBoxBaud->currentIndex(),
-                             timeout,
-                             requestdata,
-                             writeread);
+    if(ui->checkBoxPathOne_2->isChecked()){
+        serialthread.transaction(ui->serialPortComboBox->currentText(),
+                                 ui->comboBoxBaud->currentIndex(),
+                                 timeout,
+                                 requestdata,
+                                 writeread);
+    }
 }
 
 void MainWindow::on_pushButton_clicked()
 {
-//    int writeread = 12;
-//    int timeout = 1000;
-//    if(ui->checkBoxPathOne_2->isChecked()){
-//        serialthread.transaction(ui->serialPortComboBox->currentText(),
-//                                 timeout,
-//                                 "20212223",
-//                                 writeread);
-//    }
-//    if(ui->checkBoxPathTwo_2->isChecked()){
-//        serialthread.transaction(ui->serialPortComboBox->currentText(),
-//                                 timeout,
-//                                 "24252627",
-//                                 writeread);
-//    }
+    //    int writeread = 12;
+    //    int timeout = 1000;
+    //    if(ui->checkBoxPathOne_2->isChecked()){
+    //        serialthread.transaction(ui->serialPortComboBox->currentText(),
+    //                                 timeout,
+    //                                 "20212223",
+    //                                 writeread);
+    //    }
+    //    if(ui->checkBoxPathTwo_2->isChecked()){
+    //        serialthread.transaction(ui->serialPortComboBox->currentText(),
+    //                                 timeout,
+    //                                 "24252627",
+    //                                 writeread);
+    //    }
     QSerialPort newserial;
     newserial.setPortName(ui->serialPortComboBox->currentText());
     if (!newserial.open(QIODevice::ReadWrite)) {
@@ -370,168 +398,3 @@ void MainWindow::showserial2(const QString &s)
     ui->textBrowserPathTwo_2->append(s);
     ui->totalCount2_2->setText(QString::number(s.length(),10));
 }
-
-//void MainWindow::on_buttonReadStop_clicked(){
-//    serialthread.setReading(0);
-//}
-
-/*
-void MainWindow::writeTwo(){
-    DWORD RxBytes = 4;
-    DWORD TxBytes = 0;
-    UCHAR RxBuffer[4]={0};
-    UCHAR TxBuffer[1]={0};
-    DWORD BytesWritten;
-    DWORD EventDWord;
-    DWORD BytesReceived;
-    FT_STATUS ftStatus;
-    if(ui->checkBoxPathTwo->isChecked()){
-        TxBuffer[0]=0x24;
-        ftStatus = FT_Write(ftHandle, TxBuffer, 1, &BytesWritten);
-        ftStatus = FT_GetStatus(ftHandle, &RxBytes, &TxBytes, &EventDWord);
-        if ((RxBytes >= 0)&&(ftStatus == FT_OK))
-        {
-            ftStatus = FT_Read(ftHandle,RxBuffer,RxBytes,&BytesReceived);
-            ui->labelPath21->setText(QString::number(RxBuffer[0],10));
-            ui->labelPath22->setText(QString::number(RxBuffer[1],10));
-            count2 += 1;
-            ui->labelCount2->setText(QString::number(count2,10));
-            ui->labelPath23->setText(QString::number(RxBuffer[2],10));
-            ui->labelPath24->setText(QString::number(RxBuffer[3],10));
-        }
-    }
-}
-
-void MainWindow::on_buttonReadPathOne_clicked(){
-    DWORD RxBytes = 4;
-    DWORD TxBytes = 0;
-    UCHAR RxBuffer[65536]={0};
-    UCHAR TxBuffer[1]={0};
-    DWORD BytesWritten;
-    DWORD BytesReceived;
-    DWORD EventDWord;
-    QString numberRec = "";
-    QString numberRec2 = "";
-    FT_STATUS ftStatus;
-    int j = 0;
-    while(j<65536)
-    {
-        if(ui->checkBoxPathOne->isChecked()){
-            TxBuffer[0]=0x20;
-            ftStatus = FT_Write(ftHandle, TxBuffer, 1, &BytesWritten);
-            ftStatus = FT_GetStatus(ftHandle, &RxBytes, &TxBytes, &EventDWord);
-            while(RxBytes < 4){
-                ftStatus = FT_GetStatus(ftHandle, &RxBytes, &TxBytes, &EventDWord);
-            }
-            if((RxBytes >= 0)&&(ftStatus == FT_OK))
-            {
-                ftStatus = FT_Read(ftHandle,RxBuffer,RxBytes,&BytesReceived);
-                ui->labelPath11->setText(QString::number(RxBuffer[0],10));
-                //cout<<i2s(RxBuffer[0])<<"\n";
-                ui->labelPath12->setText(QString::number(RxBuffer[1],10));
-                //cout<<i2s(RxBuffer[1])<<"\n";
-                count1 += 1;
-                ui->labelCount1->setText(QString::number(count1,10));
-                ui->labelPath13->setText(QString::number(RxBuffer[2],10));
-                //cout<<i2s(RxBuffer[2])<<"\n";
-                ui->labelPath14->setText(QString::number(RxBuffer[3],10));
-                //cout<<i2s(RxBuffer[3])<<"\n";
-                ui->totalCount1->setText(QString::number(BytesReceived,10));
-                for(int i = 0; i < BytesReceived; i++)
-                {
-                    numberRec.append(s2q(i2s(RxBuffer[i])));
-                    numberRec.append(" ");
-                }
-                ui->textBrowserPathOne->append(numberRec);
-            }
-        }
-        if(ui->checkBoxPathTwo->isChecked()){
-            TxBuffer[0]=0x24;
-            ftStatus = FT_Write(ftHandle, TxBuffer, 1, &BytesWritten);
-            ftStatus = FT_GetStatus(ftHandle, &RxBytes, &TxBytes, &EventDWord);
-            while(RxBytes < 4){
-                ftStatus = FT_GetStatus(ftHandle, &RxBytes, &TxBytes, &EventDWord);
-            }
-            if ((RxBytes >= 0)&&(ftStatus == FT_OK))
-            {
-                ftStatus = FT_Read(ftHandle,RxBuffer,RxBytes,&BytesReceived);
-                ui->labelPath21->setText(QString::number(RxBuffer[0],10));
-                ui->labelPath22->setText(QString::number(RxBuffer[1],10));
-                if(BytesReceived != 0){
-                    count2 += 1;
-                }
-                ui->labelCount2->setText(QString::number(count2,10));
-                ui->labelPath23->setText(QString::number(RxBuffer[2],10));
-                ui->labelPath24->setText(QString::number(RxBuffer[3],10));
-                ui->totalCount2->setText(QString::number(BytesReceived,10));
-                for(int i = 0; i < BytesReceived; i++)
-                {
-                    numberRec2.append(s2q(i2s(RxBuffer[i])));
-                    numberRec2.append(" ");
-                }
-                ui->textBrowserPathTwo->append(numberRec2);
-            }
-        }
-    }
-}
-
-void MainWindow::on_buttonReadPathOne_clicked()
-{
-    DWORD RxBytes = 4;
-    DWORD TxBytes = 0;
-    UCHAR RxBuffer[4]={0};
-    UCHAR TxBuffer[1]={0};
-    DWORD BytesWritten;
-    DWORD BytesReceived;
-    DWORD EventDWord;
-    FT_STATUS ftStatus;
-    if(ui->checkBoxPathOne->isChecked()){
-        TxBuffer[0]=0x20;
-        ftStatus = FT_Write(ftHandle, TxBuffer, 1, &BytesWritten);
-        ftStatus = FT_GetStatus(ftHandle, &RxBytes, &TxBytes, &EventDWord);
-        if(RxBytes!=0){
-            cout<<"RxBytes:"<<RxBytes<<"\n";
-            cout.flush();
-        }
-        if ((RxBytes >= 0)&&(ftStatus == FT_OK))
-        {
-            ftStatus = FT_Read(ftHandle,RxBuffer,RxBytes,&BytesReceived);
-            ui->labelPath11->setText(QString::number(RxBuffer[0],10));
-            cout<<i2s(RxBuffer[0])<<"\n";
-            ui->labelPath12->setText(QString::number(RxBuffer[1],10));
-            cout<<i2s(RxBuffer[1])<<"\n";
-            ui->labelPath13->setText(QString::number(RxBuffer[2],10));
-            cout<<i2s(RxBuffer[2])<<"\n";
-            ui->labelPath14->setText(QString::number(RxBuffer[3],10));
-            cout<<i2s(RxBuffer[3])<<"\n";
-        }
-    }
-}
-
-void MainWindow::on_buttonReadPathTwo_clicked()
-{
-    DWORD RxBytes = 4;
-    DWORD TxBytes = 0;
-    UCHAR RxBuffer[4]={0};
-    UCHAR TxBuffer[1]={0};
-    DWORD BytesWritten;
-    DWORD EventDWord;
-    DWORD BytesReceived;
-    FT_STATUS ftStatus;
-    if(ui->checkBoxPathTwo->isChecked()){
-        TxBuffer[0]=0x24;
-        ftStatus = FT_Write(ftHandle, TxBuffer, 1, &BytesWritten);
-        ftStatus = FT_GetStatus(ftHandle, &RxBytes, &TxBytes, &EventDWord);
-        if ((RxBytes >= 0)&&(ftStatus == FT_OK))
-        {
-            ftStatus = FT_Read(ftHandle,RxBuffer,RxBytes,&BytesReceived);
-            ui->labelPath21->setText(QString::number(RxBuffer[0],10));
-            ui->labelPath22->setText(QString::number(RxBuffer[1],10));
-            ui->labelPath23->setText(QString::number(RxBuffer[2],10));
-            ui->labelPath24->setText(QString::number(RxBuffer[3],10));
-        }
-    }
-}
-*/
-
-

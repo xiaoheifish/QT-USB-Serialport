@@ -38,17 +38,17 @@ inline int bytesToInt(QByteArray bytes) {
     return addr;
 }
 inline QString s2q(const string &s) {
-     return QString(QString::fromLocal8Bit(s.c_str()));
+    return QString(QString::fromLocal8Bit(s.c_str()));
 }
 MasterThread::MasterThread(QObject *parent)
     : QThread(parent), waitTimeout(0), quit(false)
 {
     working = false;
-    hash[0] = 115200;
-    hash[1] = 57600;
-    hash[2] = 38400;
-    hash[3] = 19200;
-    hash[4] = 9600;
+    hash[0] = QSerialPort::Baud115200;
+    hash[1] = QSerialPort::Baud57600;
+    hash[2] = QSerialPort::Baud38400;
+    hash[3] = QSerialPort::Baud19200;
+    hash[4] = QSerialPort::Baud9600;
 }
 
 MasterThread::~MasterThread()
@@ -93,36 +93,29 @@ void MasterThread::run()
     mutex.unlock();
     while(!quit){
         working = true;
-//        if (currentPortNameChanged) {
-//            serial.close();
-//            serial.setPortName(currentPortName);
-//            if (!serial.open(QIODevice::ReadWrite)) {
-//                emit error(tr("Can't open %1, error code %2")
-//                           .arg(portName).arg(serial.error()));
-//                return;
-//            }
-//        }
         serial.setPortName(currentPortName);
-        if (!serial.open(QIODevice::ReadWrite)) {
+        if(!serial.open(QIODevice::ReadWrite)){
             emit error(tr("Can't open %1, error code %2")
                        .arg(portName).arg(serial.error()));
             return;
-        }    
+        }
+        serial.setBaudRate(baudRate,QSerialPort::AllDirections);
+        serial.setDataBits(QSerialPort::Data8);
+        serial.setFlowControl(QSerialPort::NoFlowControl);
+        serial.setParity(QSerialPort::NoParity);
+        serial.setStopBits(QSerialPort::OneStop);
+
         if(writeread == 9){
-            serial.setBaudRate(baudRate);
-            QByteArray requestData1 = intToByte(currentRequest.mid(0,2).toInt());
-            requestData1.resize(1);
+            QByteArray requestData1;
+            StringToHex(currentRequest.mid(0,2),requestData1);
             serial.write(requestData1);
             if (serial.waitForBytesWritten(waitTimeout)) {
             } else {
                 emit timeout(tr("Wait write request timeout %1")
                              .arg(QTime::currentTime().toString()));
             }
-            //mutex.lock();
-            //cond.wait(&mutex);
         }
         if(writeread == 10){
-            serial.setBaudRate(baudRate);
             QByteArray requestData = intToByte(currentRequest.mid(0,2).toInt());
             qDebug()<<currentRequest.length();
             if(currentRequest.length()==4){
@@ -142,11 +135,8 @@ void MasterThread::run()
                 emit timeout(tr("Wait write request timeout %1")
                              .arg(QTime::currentTime().toString()));
             }
-            //mutex.lock();
-            //cond.wait(&mutex);
         }
         if(writeread == 11){
-            serial.setBaudRate(baudRate);
             QByteArray requestData1 = intToByte(currentRequest.mid(0,2).toInt());
             requestData1.resize(1);
             serial.write(requestData1);
@@ -156,8 +146,8 @@ void MasterThread::run()
                     QByteArray responseData = serial.readAll();
                     while (serial.waitForReadyRead(1000))
                         responseData += serial.readAll();
-                        int a = bytesToInt(responseData);
-                        QString responseint = s2q(i2s(a));
+                    int a = bytesToInt(responseData);
+                    QString responseint = s2q(i2s(a));
                     QString response(responseint);
                     emit this->response(response);
                 }else {
@@ -168,10 +158,7 @@ void MasterThread::run()
                 emit timeout(tr("Wait write request timeout %1")
                              .arg(QTime::currentTime().toString()));
             }
-            //mutex.lock();
-            //cond.wait(&mutex);
         }
-
         while(writeread == 12 && isReading == 1){
             serial.setBaudRate(baudRate);
             if(currentRequest == "20"){
@@ -271,6 +258,9 @@ void MasterThread::run()
                     emit timeout(tr("Wait write request timeout %1")
                                  .arg(QTime::currentTime().toString()));
                 }
+                if(baudRate == 19200 || baudRate == 9600){
+                    msleep(5);
+                }
                 QByteArray requestData3;
                 requestData3.resize(1);
                 requestData3[0] = 0x24;
@@ -303,9 +293,16 @@ void MasterThread::run()
                 }
 
             }
+            if(baudRate == 19200 || baudRate == 9600){
+                msleep(5);
+            }
         }
         mutex.lock();
+        msleep(5);
         serial.close();
+        if(writeread == 12 && isReading == 0){
+            emit this->pathtwosend();
+        }
         cond.wait(&mutex);
         if (currentPortName != portName) {
             currentPortName = portName;
@@ -323,9 +320,54 @@ void MasterThread::stop(){
     quit = true;
 }
 
+void MasterThread::StringToHex(QString str, QByteArray &senddata) //字符串转换为十六进制数据0-F
+{
+    int hexdata,lowhexdata;
+    int hexdatalen = 0;
+    int len = str.length();
+    senddata.resize(len/2);
+    char lstr,hstr;
 
-void MasterThread::setReading(int isReading) {
-    this->isReading = isReading;
-    //quit = true;
+    for(int i=0; i<len; )
+    {
+        //char lstr,
+        hstr=str[i].toLatin1();
+        if(hstr == ' ')
+        {
+            i++;
+            continue;
+        }
+        i++;
+        if(i >= len)
+            break;
+        lstr = str[i].toLatin1();
+        hexdata = ConvertHexChar(hstr);
+        lowhexdata = ConvertHexChar(lstr);
+        if((hexdata == 16) || (lowhexdata == 16))
+            break;
+        else
+            hexdata = hexdata*16+lowhexdata;
+        i++;
+        senddata[hexdatalen] = (char)hexdata;
+        hexdatalen++;
+    }
+    senddata.resize(hexdatalen);
 }
 
+char MasterThread::ConvertHexChar(char ch)
+{
+    if((ch >= '0') && (ch <= '9'))
+        return ch-0x30;
+    else if((ch >= 'A') && (ch <= 'F'))
+        return ch-'A'+10;
+    else if((ch >= 'a') && (ch <= 'f'))
+        return ch-'a'+10;
+    else return ch-ch;//不在0-f范围内的会发送成0
+}
+void MasterThread::setReading(int isReading) {
+    this->isReading = isReading;
+}
+
+int MasterThread::getState(){
+    return this->writeread;
+}

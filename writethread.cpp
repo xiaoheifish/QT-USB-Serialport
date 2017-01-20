@@ -51,3 +51,5 @@ void writethread::setFtHandle(FT_HANDLE handle){
     ftHandle = handle;
 }
 
+
+
