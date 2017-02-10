@@ -24,3 +24,4 @@ HEADERS  += mainwindow.h \
     masterthread.h
 
 FORMS    += mainwindow.ui
+RC_FILE = iconfile.rc

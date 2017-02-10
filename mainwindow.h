@@ -28,6 +28,8 @@ private slots:
     void showserial(const QString &s);
     void showserial2(const QString &s);
     void pathtwosenddata();
+    void usbresponsedata(const QString &s, DWORD bytesreceived);
+    void usbresponsedata2(const QString &s, DWORD bytesreceived);
     void on_buttonSelfWrite_clicked();
     void on_buttonSelfRead_clicked();
     void on_buttonAddWrite_clicked();
@@ -35,21 +37,24 @@ private slots:
     void showResponse(const QString &s);
     void on_buttonSelfRead_2_clicked();
     void on_buttonAddWrite_2_clicked();
-    void on_pushButton_clicked();
+    //void on_pushButton_clicked();
     void on_radioButtonUSB_clicked();
     void on_radioButtonSerial_clicked();
     //void on_buttonReadStop_clicked();
     void on_radioButtonUSBStop_clicked();
     void on_radioButtonreadstop_clicked();
     void on_buttonUSBStart_clicked();
+    void close_USB();
 private:
     Ui::MainWindow *ui;
+    QString *channel;
     FT_HANDLE ftHandle;
     QTimer timer;
     QTimer timer2;
     QTimer timerserial;
     int currentBaudRate;
     int baudCount = 0;
+    int USBstatus = 0;
     bool flagOne = true;
     bool flagTwo = false;
     bool USBcomm = false;
@@ -60,8 +65,7 @@ private:
     MasterThread serialthread;
     MasterThread serialthread1;
     MasterThread *myserial;
-
-    //writethread thread;
+    writethread thread;
 };
 
 #endif // MAINWINDOW_H

@@ -5,6 +5,9 @@
 #include <QtSerialPort/QSerialPort>
 #include <iostream>
 #include <QDebug>
+#define TxSector (1024*64)
+#define RxSector (1024*64)
+
 using namespace std;
 inline string i2s(int number)
 {
@@ -41,6 +44,9 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
     //Set tabWidget background transparent
     ui->tabWidget->setStyleSheet("QTabWidget:pane{border-top:0px solid #e8f3f9;background:transparent;}");
+    channel = new QString;
+    *channel = "";
+    qRegisterMetaType<DWORD>("DWORD");
     connect(&serialthread, SIGNAL(response(QString)),
             this, SLOT(showResponse(QString)));
     connect(&serialthread, SIGNAL(responserial(QString)),
@@ -49,7 +55,13 @@ MainWindow::MainWindow(QWidget *parent) :
             this,SLOT(showserial2(QString)));
     connect(&serialthread, SIGNAL(pathtwosend()),
             this,SLOT(pathtwosenddata()));
-    foreach (const QSerialPortInfo &info, QSerialPortInfo::availablePorts())
+    connect(&thread, SIGNAL(usbresponse(QString, DWORD)),
+            this,SLOT(usbresponsedata(QString,DWORD)));
+    connect(&thread, SIGNAL(usbresponse2(QString,DWORD)),
+            this,SLOT(usbresponsedata2(QString,DWORD)));
+    connect(&thread, SIGNAL(close_USBsignal()),
+            this, SLOT(close_USB()));
+    foreach(const QSerialPortInfo &info, QSerialPortInfo::availablePorts())
         ui->serialPortComboBox->addItem(info.portName());
     ui->serialPortComboBox->setFocus();
 }
@@ -59,9 +71,15 @@ MainWindow::~MainWindow()
     if(serialthread.isRunning()){
         serialthread.stop();
     }
+    if(thread.isRunning()){
+        thread.stop();
+    }
     if(USBcomm == true){
-
         FT_Close(ftHandle);
+    }
+    if (channel != NULL){
+        delete channel;
+        channel = NULL;
     }
 }
 void MainWindow::pathtwosenddata(){
@@ -79,7 +97,7 @@ void MainWindow::pathtwosenddata(){
 
 void MainWindow::on_radioButtonSerial_clicked(){
     //delete current item
-    for(int i =0 ; i < ui->serialPortComboBox->count();i++){
+    for(int i =0;i < ui->serialPortComboBox->count();i++){
         ui->serialPortComboBox->removeItem(0);
     }
     //Get current available COM port
@@ -99,6 +117,7 @@ void MainWindow::on_radioButtonSerial_clicked(){
 }
 void MainWindow::on_radioButtonUSB_clicked(){
     USBcomm = true;
+    UCHAR LatencyTimer = 1;
     UCHAR Mode = 0x40;//Set single chanel synchronous FT245 mode
     UCHAR Mask = 0xff;//written to device
     FT_STATUS ftStatus = FT_Open(0, &ftHandle);
@@ -106,15 +125,29 @@ void MainWindow::on_radioButtonUSB_clicked(){
     {
         ftStatus = FT_SetBitMode(ftHandle, Mask, Mode);
     }
+    if (ftStatus == FT_OK)
+    {
+        ftStatus = FT_SetLatencyTimer(ftHandle, LatencyTimer);
+        ftStatus = FT_SetUSBParameters(ftHandle, RxSector, TxSector); // (64KB, 512B)
+        ftStatus = FT_SetFlowControl(ftHandle, FT_FLOW_RTS_CTS, 0, 0);
+        ftStatus = FT_Purge(ftHandle, FT_PURGE_RX);
+        // access data from here
+    }
 }
 
 void MainWindow::on_radioButtonUSBStop_clicked()
 {
     flagOne = false;
-    if(USBcomm == true){
-        timer.stop();
+    if(thread.isRunning()){
+        thread.setReading(0);
+    }
+    if(USBstatus == 1 || USBstatus == 2){
         FT_Close(ftHandle);
     }
+//    if(USBcomm == true){
+//        timer.stop();
+//        FT_Close(ftHandle);
+//    }
 }
 void MainWindow::on_radioButtonreadstop_clicked()
 {
@@ -134,6 +167,7 @@ void MainWindow::on_radioButtonreadstop_clicked()
 }
 void MainWindow::on_buttonSelfWrite_clicked()
 {
+    USBstatus = 1;
     BYTE TxBufferAdd[2]={0};
     DWORD BytesWritten;
     TxBufferAdd[0]=0x01;
@@ -146,6 +180,7 @@ void MainWindow::on_buttonSelfWrite_clicked()
 
 void MainWindow::on_buttonSelfRead_clicked()
 {
+    USBstatus = 2;
     BYTE TxBufferSelf[1]={0};
     BYTE RxBuffer[4]={0};
     DWORD BytesReceived;
@@ -174,6 +209,7 @@ void MainWindow::on_buttonSelfRead_clicked()
 }
 void MainWindow::on_buttonAddWrite_clicked()
 {
+    USBstatus = 3;
     BYTE TxBufferAdd[2]={0};
     DWORD BytesWritten;
     FT_STATUS ftStatus;
@@ -183,18 +219,21 @@ void MainWindow::on_buttonAddWrite_clicked()
         cout<<i2s(TxBufferAdd[1])<<"\n";
         ftStatus = FT_Write(ftHandle, TxBufferAdd, 2, &BytesWritten);
         cout<<BytesWritten<<"\n";
+        channel->append("11");
     }
     if(ui->checkBoxPathTwo->isChecked()){
         TxBufferAdd[0]=0x11;
         TxBufferAdd[1]=ui->textPathTwo->text().toInt();
         ftStatus = FT_Write(ftHandle, TxBufferAdd, 2, &BytesWritten);
+        channel->append("21");
     }
-    timer.start(1);
-    connect(&timer,SIGNAL(timeout()),this,SLOT(writeOne()));
+    //timer.start(1);
+    //connect(&timer,SIGNAL(timeout()),this,SLOT(writeOne()));
     //QMessageBox::information(this, "Message", "位宽数据已经写入硬件");
-
+    thread.setChannel(channel);
+    thread.setFtHandle(ftHandle);
+    thread.transaction();
 }
-
 void MainWindow::writeOne(){
     DWORD RxBytes = 4;
     DWORD TxBytes = 0;
@@ -265,7 +304,48 @@ void MainWindow::writeOne(){
     }
 
 }
-
+void MainWindow::usbresponsedata(const QString &s, DWORD bytesreceived){
+    QString numberRec = "";
+    ui->labelPath11->setText(s.mid(0,2));
+    //cout<<i2s(RxBuffer[0])<<"\n";
+    //qDebug()<<s.mid(0,2);
+    ui->labelPath12->setText(s.mid(2,2));
+    //qDebug()<<s.mid(2,2);
+    //cout<<i2s(RxBuffer[1])<<"\n";
+    count1 += 1;
+    ui->labelCount1->setText(QString::number(count1,10));
+    ui->labelPath13->setText(s.mid(4,2));
+    //cout<<i2s(RxBuffer[2])<<"\n";
+    //qDebug()<<s.mid(4,2);
+    ui->labelPath14->setText(s.mid(6,2));
+    //cout<<i2s(RxBuffer[3])<<"\n";
+    //qDebug()<<s.mid(6,2);
+    ui->totalCount1->setText(QString::number(bytesreceived,10));
+    for(int i = 0; i < bytesreceived; i++)
+    {
+        numberRec.append(s.mid(2*i,2));
+        numberRec.append(" ");
+    }
+    ui->textBrowserPathOne->append(numberRec);
+}
+void MainWindow::usbresponsedata2(const QString &s, DWORD bytesreceived){
+    QString numberRec = "";
+    ui->labelPath21->setText(s.mid(0,2));
+    ui->labelPath22->setText(s.mid(2,2));
+    if(bytesreceived != 0){
+        count2 += 1;
+    }
+    ui->labelCount2->setText(QString::number(count2,10));
+    ui->labelPath23->setText(s.mid(4,2));
+    ui->labelPath24->setText(s.mid(6,2));
+    ui->totalCount2->setText(QString::number(bytesreceived,10));
+    for(int i = 0; i < bytesreceived; i++)
+    {
+        numberRec.append(s.mid(2*i,2));
+        numberRec.append(" ");
+    }
+    ui->textBrowserPathTwo->append(numberRec);
+}
 void MainWindow::showResponse(const QString &s)
 {
     ui->textSelfRead_2->setText(tr("Data:%1").arg(s));
@@ -318,6 +398,11 @@ void MainWindow::on_buttonUSBStart_clicked()
 {
     writeserial();
 }
+
+void MainWindow::close_USB()
+{
+    FT_Close(ftHandle);
+}
 void MainWindow::writeserial()
 {
     int writeread = 12;
@@ -342,39 +427,39 @@ void MainWindow::writeserial()
     }
 }
 
-void MainWindow::on_pushButton_clicked()
-{
-    //    int writeread = 12;
-    //    int timeout = 1000;
-    //    if(ui->checkBoxPathOne_2->isChecked()){
-    //        serialthread.transaction(ui->serialPortComboBox->currentText(),
-    //                                 timeout,
-    //                                 "20212223",
-    //                                 writeread);
-    //    }
-    //    if(ui->checkBoxPathTwo_2->isChecked()){
-    //        serialthread.transaction(ui->serialPortComboBox->currentText(),
-    //                                 timeout,
-    //                                 "24252627",
-    //                                 writeread);
-    //    }
-    QSerialPort newserial;
-    newserial.setPortName(ui->serialPortComboBox->currentText());
-    if (!newserial.open(QIODevice::ReadWrite)) {
-        qDebug()<<"wrong";
-    }
-    newserial.setBaudRate(QSerialPort::Baud115200);
-    QByteArray requestData1 = intToByte(int(rand()*25));
-    requestData1.resize(1);
-    newserial.write(requestData1);
-    if (newserial.waitForBytesWritten(1000)){
-        qDebug()<<"timeout";
-    }
-    else{
-        qDebug()<<"fsggs";
-    }
-    newserial.close();
-}
+//void MainWindow::on_pushButton_clicked()
+//{
+//    //    int writeread = 12;
+//    //    int timeout = 1000;
+//    //    if(ui->checkBoxPathOne_2->isChecked()){
+//    //        serialthread.transaction(ui->serialPortComboBox->currentText(),
+//    //                                 timeout,
+//    //                                 "20212223",
+//    //                                 writeread);
+//    //    }
+//    //    if(ui->checkBoxPathTwo_2->isChecked()){
+//    //        serialthread.transaction(ui->serialPortComboBox->currentText(),
+//    //                                 timeout,
+//    //                                 "24252627",
+//    //                                 writeread);
+//    //    }
+//    QSerialPort newserial;
+//    newserial.setPortName(ui->serialPortComboBox->currentText());
+//    if (!newserial.open(QIODevice::ReadWrite)) {
+//        qDebug()<<"wrong";
+//    }
+//    newserial.setBaudRate(QSerialPort::Baud115200);
+//    QByteArray requestData1 = intToByte(int(rand()*25));
+//    requestData1.resize(1);
+//    newserial.write(requestData1);
+//    if (newserial.waitForBytesWritten(1000)){
+//        qDebug()<<"timeout";
+//    }
+//    else{
+//        qDebug()<<"fsggs";
+//    }
+//    newserial.close();
+//}
 
 void MainWindow::showserial(const QString &s)
 {
